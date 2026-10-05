@@ -1,0 +1,53 @@
+name: Build Bebo Design APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: تحميل المشروع
+        uses: actions/checkout@v4
+
+      - name: فك ملف المشروع
+        run: |
+          ZIP="$(find . -maxdepth 1 -type f -name 'BeboDesign-Android-Project.zip' -print -quit)"
+          if [ -z "$ZIP" ]; then
+            echo "لم يتم العثور على ملف ZIP"
+            exit 1
+          fi
+
+          mkdir project
+          unzip -q "$ZIP" -d project
+          cp -R project/. .
+          rm -rf project "$ZIP"
+
+      - name: إصلاح إعدادات المشروع
+        run: |
+          sed -i '/id("org.jetbrains.kotlin.android") version "2.0.21" apply false/a\    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false' build.gradle.kts
+          sed -i '/id("org.jetbrains.kotlin.android")/a\    id("org.jetbrains.kotlin.plugin.compose")' app/build.gradle.kts
+          sed -i 's/Icons.Default.WhatsApp/Icons.Default.Send/g' app/src/main/java/com/bebodesign/app/MainActivity.kt
+
+      - name: إعداد Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: إعداد Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: بناء APK
+        run: gradle assembleDebug
+
+      - name: حفظ ملف APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BeboDesign-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
